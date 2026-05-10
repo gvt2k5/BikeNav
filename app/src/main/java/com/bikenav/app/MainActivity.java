@@ -1,15 +1,19 @@
 package com.bikenav.app;
 
+import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.*;
+import android.content.pm.PackageManager;
 import android.os.*;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.view.View;
 import android.widget.*;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -26,17 +30,16 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter bluetoothAdapter;
     private static final String TARGET_DEVICE_NAME = "BikeNav";
 
-    // Receive broadcasts from BluetoothService and NotificationListenerService
+    private ActivityResultLauncher<String[]> bluetoothPermissionLauncher;
+
     private final BroadcastReceiver uiReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (action == null) return;
-
             switch (action) {
                 case BluetoothService.ACTION_STATUS:
-                    String status = intent.getStringExtra(BluetoothService.EXTRA_STATUS);
-                    updateStatus(status);
+                    updateStatus(intent.getStringExtra(BluetoothService.EXTRA_STATUS));
                     break;
                 case BluetoothService.ACTION_COMMAND_SENT:
                     String cmd = intent.getStringExtra(BluetoothService.EXTRA_COMMAND);
@@ -50,8 +53,7 @@ public class MainActivity extends AppCompatActivity {
                     if (parsed != null) appendLog("✅ Parsed: " + parsed);
                     break;
                 case BluetoothService.ACTION_LOG:
-                    String log = intent.getStringExtra(BluetoothService.EXTRA_LOG);
-                    appendLog(log);
+                    appendLog(intent.getStringExtra(BluetoothService.EXTRA_LOG));
                     break;
             }
         }
@@ -62,14 +64,26 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tvStatus = findViewById(R.id.tvStatus);
+        tvStatus      = findViewById(R.id.tvStatus);
         tvLastCommand = findViewById(R.id.tvLastCommand);
-        tvLog = findViewById(R.id.tvLog);
-        btnConnect = findViewById(R.id.btnConnect);
+        tvLog         = findViewById(R.id.tvLog);
+        btnConnect    = findViewById(R.id.btnConnect);
         btnDisconnect = findViewById(R.id.btnDisconnect);
-        scrollLog = findViewById(R.id.scrollLog);
+        scrollLog     = findViewById(R.id.scrollLog);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+
+        bluetoothPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                Boolean granted = result.get(Manifest.permission.BLUETOOTH_CONNECT);
+                if (Boolean.TRUE.equals(granted)) {
+                    doConnect();
+                } else {
+                    Toast.makeText(this, "Bluetooth permission denied", Toast.LENGTH_SHORT).show();
+                }
+            }
+        );
 
         btnConnect.setOnClickListener(v -> connectToBikeNav());
         btnDisconnect.setOnClickListener(v -> disconnectFromBikeNav());
@@ -82,7 +96,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Register broadcast receiver
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothService.ACTION_STATUS);
         filter.addAction(BluetoothService.ACTION_COMMAND_SENT);
@@ -90,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction(NavNotificationListenerService.ACTION_NAV_DATA);
         registerReceiver(uiReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
-        checkPermissions();
+        checkNotificationPermission();
         updateStatus("Idle — not connected");
         appendLog("BikeNav started. Tap 'Connect' to begin.");
     }
@@ -105,36 +118,51 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Find BikeNav in paired devices
-        Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-        BluetoothDevice target = null;
-
-        List<String> deviceNames = new ArrayList<>();
-        List<BluetoothDevice> deviceList = new ArrayList<>();
-
-        for (BluetoothDevice device : pairedDevices) {
-            deviceNames.add(device.getName() + "\n" + device.getAddress());
-            deviceList.add(device);
-            if (TARGET_DEVICE_NAME.equals(device.getName())) {
-                target = device;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                    != PackageManager.PERMISSION_GRANTED) {
+                bluetoothPermissionLauncher.launch(new String[]{
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN
+                });
+                return;
             }
         }
 
-        if (target != null) {
-            // Auto connect to BikeNav
-            startBluetoothService(target.getAddress());
-        } else if (!deviceList.isEmpty()) {
-            // Let user pick from paired devices
-            BluetoothDevice finalTarget = target;
-            String[] names = deviceNames.toArray(new String[0]);
-            new AlertDialog.Builder(this)
-                .setTitle("Select Bluetooth Device")
-                .setItems(names, (dialog, which) -> {
-                    startBluetoothService(deviceList.get(which).getAddress());
-                })
-                .show();
-        } else {
-            Toast.makeText(this, "No paired devices found. Pair your ESP32 first.", Toast.LENGTH_LONG).show();
+        doConnect();
+    }
+
+    private void doConnect() {
+        try {
+            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+            BluetoothDevice target = null;
+            List<String> deviceNames = new ArrayList<>();
+            List<BluetoothDevice> deviceList = new ArrayList<>();
+
+            for (BluetoothDevice device : pairedDevices) {
+                String name = device.getName();
+                deviceNames.add((name != null ? name : "Unknown") + "\n" + device.getAddress());
+                deviceList.add(device);
+                if (TARGET_DEVICE_NAME.equals(name)) {
+                    target = device;
+                }
+            }
+
+            if (target != null) {
+                startBluetoothService(target.getAddress());
+            } else if (!deviceList.isEmpty()) {
+                String[] names = deviceNames.toArray(new String[0]);
+                List<BluetoothDevice> finalList = deviceList;
+                new AlertDialog.Builder(this)
+                    .setTitle("Select Bluetooth Device")
+                    .setItems(names, (dialog, which) ->
+                        startBluetoothService(finalList.get(which).getAddress()))
+                    .show();
+            } else {
+                Toast.makeText(this, "No paired devices found. Pair your ESP32 first.", Toast.LENGTH_LONG).show();
+            }
+        } catch (SecurityException e) {
+            Toast.makeText(this, "Bluetooth permission error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -161,10 +189,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void appendLog(String text) {
+        if (text == null) return;
         String current = tvLog.getText().toString();
         String timestamp = android.text.format.DateFormat.format("HH:mm:ss", System.currentTimeMillis()).toString();
         tvLog.setText(current + "\n[" + timestamp + "] " + text);
-        // Auto scroll to bottom
         scrollLog.post(() -> scrollLog.fullScroll(View.FOCUS_DOWN));
     }
 
@@ -173,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
         return flat != null && flat.contains(getPackageName());
     }
 
-    private void checkPermissions() {
+    private void checkNotificationPermission() {
         if (!isNotificationListenerEnabled()) {
             new AlertDialog.Builder(this)
                 .setTitle("Notification Access Required")
