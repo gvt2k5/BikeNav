@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0D1117"
+    android:padding="16dp">
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🏍 BikeNav"
+        android:textColor="#58A6FF"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingTop="16dp"
+        android:paddingBottom="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Google Maps → ESP32 Auto Navigation"
+        android:textColor="#8B949E"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:paddingBottom="20dp" />
+
+    <!-- Status Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_background"
+        android:padding="16dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Status: Idle"
+            android:textColor="#E6EDF3"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvLastCommand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Last: —"
+            android:textColor="#3FB950"
+            android:textSize="14sp"
+            android:paddingTop="6dp"
+            android:fontFamily="monospace" />
+
+    </LinearLayout>
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="🔵 Connect"
+            android:backgroundTint="#238636"
+            android:textColor="#FFFFFF"
+            android:layout_marginEnd="6dp" />
+
+        <Button
+            android:id="@+id/btnDisconnect"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="🔴 Disconnect"
+            android:backgroundTint="#DA3633"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="6dp" />
+
+    </LinearLayout>
+
+    <!-- Notification Permission Button -->
+    <Button
+        android:id="@+id/btnGrantNotification"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🔔 Grant Notification Access"
+        android:backgroundTint="#1F6FEB"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Live Log -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Live Log"
+        android:textColor="#8B949E"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:paddingBottom="6dp" />
+
+    <ScrollView
+        android:id="@+id/scrollLog"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/card_background"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#8B949E"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="4dp" />
+
+    </ScrollView>
+
+</LinearLayout>
